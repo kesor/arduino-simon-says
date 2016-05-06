@@ -30,12 +30,18 @@ RgbColor black ( 0 );
 
 // Simon Says memory buffer
 const int simonMaxSize = 100;
-int sumonTurnNum = 1;
+int simonTurnNum = 0;
 int simonOrder[simonMaxSize] = { -1 };
+int simonTurnPause = 500;
 
 // function declarations
 void SetRandomSeed();
 void flash(int times, RgbColor flash_color, RgbColor background_color);
+void updateSimonSequence();
+void displaySimonSequence();
+void inputSimonSequence();
+void simonIsAWinner();
+void simonIsALoser();
 
 // Instantiate a Keypad and a NeoPixel pixels
 NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> pixels(pixelCount, pixelPin);
@@ -45,18 +51,84 @@ void setup() {
   // clear pixels into black
   pixels.Begin();
   pixels.Show();
+  flash(1, white, black);
 
   // make random numbers more random
   SetRandomSeed();
 }
 
 void loop() {
-  char c = customKeypad.waitForKey();
-  int pixel = strtol(&c, NULL, 16);
-  flash(2, green, black);
-  pixels.SetPixelColor(pixel, red);
+  updateSimonSequence();
+  displaySimonSequence();
+  inputSimonSequence();
+}
+
+void updateSimonSequence() {
+  if (simonTurnNum < simonMaxSize-1) {
+    // add a new value as latest flashing
+    simonOrder[simonTurnNum] = random(16);
+    simonTurnNum++;
+    // set the "no more flashing" marker (-1)
+    simonOrder[simonTurnNum] = -1;
+  }
+  if (simonTurnNum == simonMaxSize) {
+    simonIsAWinner();
+  }
+}
+
+void displaySimonSequence() {
+  delay(simonTurnPause);
+  for (int flashing=0; flashing<simonMaxSize; flashing++) {
+    if (simonOrder[flashing] == -1) {
+      break;
+    }
+    pixels.SetPixelColor(simonOrder[flashing], blue);
+    pixels.Show();
+    delay(simonTurnPause);
+    pixels.SetPixelColor(simonOrder[flashing], black);
+    pixels.Show();
+    delay(flashPause);
+  }
+  // blank the pixels
+  pixels.Begin();
   pixels.Show();
-  pixels.SetPixelColor(pixel, black);
+}
+
+void inputSimonSequence() {
+  for (int input=0; input<simonMaxSize; input++) {
+    // finishing the sequence is a won turn
+    if (input > 0 && simonOrder[input] == -1) {
+      delay(simonTurnPause);
+      flash(1, green, black);
+      break;
+    }
+    char c = customKeypad.waitForKey();
+    int pixel = strtol(&c, NULL, 16);
+    if (pixel == simonOrder[input]) {
+      pixels.SetPixelColor(pixel, blue);
+      pixels.Show();
+      delay(flashPause);
+      pixels.SetPixelColor(pixel, black);
+      pixels.Show();
+    } else {
+      simonIsALoser();
+      break;
+    }
+  }
+}
+
+void simonIsAWinner() {
+  flash(4, green, black);
+  simonOrder[0] = -1;
+  simonTurnNum = 0;
+  delay(flashPause*4);
+}
+
+void simonIsALoser() {
+  flash(2, red, black);
+  simonOrder[0] = -1;
+  simonTurnNum = 0;
+  delay(simonTurnPause);
 }
 
 void SetRandomSeed() {
